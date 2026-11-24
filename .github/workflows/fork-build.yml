@@ -1,0 +1,55 @@
+name: fork-build-deb
+
+on:
+  push:
+    branches:
+      - build/selfuse
+  workflow_dispatch:
+
+jobs:
+  deb:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libappindicator3-dev patchelf libgtk-3-dev \
+            librsvg2-dev libxcb-shape0-dev libxcb-xfixes0-dev libsoup-3.0 \
+            javascriptcoregtk-4.1 webkit2gtk-4.1 pkg-config \
+            libfreetype6-dev libfontconfig1-dev
+
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Setup
+        run: yarn setup
+
+      - name: Build workspaces
+        run: yarn build
+
+      - name: Build app (deb)
+        run: yarn build:desktop --bundles deb --no-sign
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: markflowy-deb
+          path: target/release/bundle/deb/*.deb
+          if-no-files-found: error
